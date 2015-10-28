@@ -38,27 +38,7 @@ if [ ! -z "`echo $linuxReleaseName | grep -Ei 'Ubuntu|Debian'`" ]; then
 	. ../lib/ubuntu/config.sh
 fi
 
-. /opt/fog-git/lib/common/config.sh
-
-#set apache user variable
-#if [ ! -z "`echo $linuxReleaseName | grep -Ei 'Fedora|Redhat|CentOS'`" ]; then
-#		apacheuser="apache";
-#		tftpdirdst="/tftpboot";
-#	if [ ! -z "`echo $linuxReleaseName | grep -Ei 'Mageia'`" ]; then
-#		apacheuser="apache";
-#		tftpdirdst="/var/lib/tftpboot";
-#	if [ ! -z "`echo $linuxReleaseName | grep -Ei 'Arch'`" ]; then
-#		apacheuser="http";
-#		tftpdirdst="/srv/tftp";
-#	if [ ! -z "`echo $linuxReleaseName | grep -Ei 'Ubuntu|Debian'`" ]; then
-#		apacheuser="http";
-#		tftpdirdst="/tftpboot";
-#	
-#fi
-#
-#fogprogramdir="/opt/fog"
-#fogutilsdir="${fogprogramdir}/utils";
-
+. ../lib/common/config.sh
 
 chown -R ${apacheuser} ${fogutilsdir} >/dev/null 2>&1
 chmod -R 700 ${fogutilsdir} >/dev/null 2>&1
