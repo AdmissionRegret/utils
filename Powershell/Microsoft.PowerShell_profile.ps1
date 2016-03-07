@@ -2,7 +2,7 @@
 
 #To save your credentials you must run this command and enter your admin password first. 
 #If your documents folder is redirected you will have to change the path after out-file. 
-#read-host -AsSecureString | ConvertFrom-SecureString | out-file c:\users\$env:USERNAME\Documents\WindowsPowerShell\securestring.txt
+#Read-Host -AsSecureString | ConvertFrom-SecureString | Out-File $ENV:USERPROFILE\Documents\WindowsPowerShell\securestring.txt
 
 $scriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 
