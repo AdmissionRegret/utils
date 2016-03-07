@@ -23,6 +23,7 @@ if ($result -eq "1") {
 	exit
 } else {
 	Import-Module MSOnline
+	#Set this to the email address you administer O365 with.
 	$username = "!!!ADMIN EMAIL!!!"
 	$password = cat $scriptPath\securestring.txt | convertto-securestring
 	$O365Cred = new-object -typename System.Management.Automation.PSCredential -argumentlist $username, $password
