@@ -1,3 +1,9 @@
+#This profile script will ask if you want to connect before connecting to office 365.
+
+#To save your credentials you must run this command and enter your admin password first. 
+#If your documents folder is redirected you will have to change the path after out-file. 
+#read-host -AsSecureString | ConvertFrom-SecureString | out-file c:\users\$env:USERNAME\Documents\WindowsPowerShell\securestring.txt
+
 $scriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 
 #Prompt to continue
