@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+#Found on Ubuntu forums created by JohnAStebbins.
+#http://ubuntuforums.org/showthread.php?t=1811354&p=11084638#post11084638
+
 import os
 import sys
 import getopt
