@@ -1,0 +1,6 @@
+#!/bin/bash
+ip=`echo $SSH_CONNECTION | cut -d " " -f 1` 
+HOSTNAME=`cat /etc/hostname | cut -d "." -f 1`
+
+logger -t ssh-wrapper $USER login from $ip
+echo "Subject: User $USER logged in to $HOSTNAME\r\n\r\nUser $USER logged in to $HOSTNAME from $ip on:" `date` | msmtp --from=default -t $email
