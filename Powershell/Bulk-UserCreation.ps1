@@ -1,3 +1,11 @@
+<#
+Description: Create users from csv located at $desktop\User-Automation\names.csv
+Example csv:
+first,last,school,Title,Phone,Distro,username,password
+Cory,Landry,NOLA,Help Desk,yes,,,
+Cory,Landry,NOLA,Help Desk,no,helpdesk@domain.org,clandr,1234ideclareathumbwar
+#>
+
 #Env variables
 $desktop=[Environment]::GetFolderPath("Desktop")
 $domain="domain.org"
@@ -32,29 +40,23 @@ Function USERCREATE {
 		write-Host $lastname "Usernameis set, continuing"    
 	} else {
 		$username = $firstname.substring(0,1)+$lastname
-
-		$error.clear()
-		get-mailbox $username
-
-		IF($error.count -eq "0") {            
+		if (!(get-aduser $username -ErrorAction SilentlyContinue))
+		{
+			write-Host $username "is not taken, continuing..."
+		} else {
 			write-Host $username "is taken, changing"    
 			$username = $firstname.substring(0,2)+$lastname	
-			
-			$error.clear()
-			get-mailbox $username
-
-			IF($error.count -eq "0") {            
-				write-Host $username "is taken, changing"    
-				$username = $firstname+"."+$lastname
+			if (!(get-aduser $username -ErrorAction SilentlyContinue))
+			{
+				write-Host $username "is not taken, continuing..."
 			} else {
-				write-Host $username "is not taken, continuing"
+				write-Host $username "is still taken, changing..."    
+				$username = $firstname+"."+$lastname
 			}
-		} else {
-			write-Host $username "is not taken, continuing"
+		}
 	}
-
-		$username = $username.tolower()	
-	}
+	
+	$username=$username.tolower()
 
 	#Set fullname
 	$Name=$Firstname+" "+$Lastname
@@ -67,9 +69,7 @@ Function USERCREATE {
 		$rand = get-random -minimum 1000 -maximum 9999
 		$password = $firstname.substring(0,1).toupper()+$lastname.substring(0,3).tolower()+$rand
 	}
-	#Conevert password to securestring
-	$accountpassword = convertto-securestring $password -asplaintext -force
-
+	
 	#Create upn
 	$upn = $username+"@"+$domain
 
@@ -99,7 +99,11 @@ Function USERCREATE {
 
 	#create user mailbox
 	write-host "Creating mailbox for $username"
-	New-MailUser -Name $name -FirstName $firstname -LastName $lastname -MicrosoftOnlineServicesID $upn -Password $accountpassword
+	New-MailUser -Name $name `
+	-FirstName $firstname `
+	-LastName $lastname `
+	-MicrosoftOnlineServicesID $upn `
+	-Password (convertto-securestring $password -asplaintext -force)
 
 	#create gapps account
 	write-host "Creating google apps account for $username"
@@ -107,7 +111,19 @@ Function USERCREATE {
 
 	#Create Active Directory user
 	write-host "Creating AD account for $username"
-	New-ADUser -SamAccountName $username -GivenName $firstname -Surname $lastname -DisplayName $name -Name $name -Path $ou -accountpassword $accountpassword -userprincipalname $upn -EmailAddress $upn -passwordneverexpires $true -enabled $true
+	New-ADUser `
+    	-SamAccountName $username `
+    	-GivenName $firstname `
+    	-Surname $lastname `
+    	-DisplayName $name `
+    	-Name $name `
+    	-Path $ou `
+    	-accountpassword (convertto-securestring $password -asplaintext -force) `
+    	-userprincipalname $upn `
+    	-EmailAddress $upn `
+    	-passwordneverexpires $true `
+    	-enabled $true `
+    	-title $title
 
 	#Add user to staff group
 	write-host "Adding $username to staff group"
@@ -180,10 +196,9 @@ Function USERCREATE2 {
 	#Set fullname, username, password, and upn
 	$upn = $username+"@"+$domain
 
-	#Prompt for School
-	$school=$school.toupper()
 
 	#check school and set homedir/distro
+	$school=$school.toupper()
 	Switch ($school)
 	{
 		NOLA 
@@ -229,13 +244,12 @@ $uname=$csv.username
 $userpn = $csv.username+"@"+$domain
 
 #Check to see if last user is available in msol
-do {
-	$error.clear()
-	Write-host "Sleeping for 5 seconds"
-	Start-Sleep -s 5
-	Write-host "Waiting for MSOL to become ready"
-	Get-Msoluser -userprincipalname $userpn
-} until ($error.count -eq "0")
+While (!( get-msoluser -UserPrincipalName $userpn -ErrorAction SilentlyContinue))
+{
+	Write-host "Waiting for MSOL to become ready: $WaitTime..."
+	Start-Sleep -Seconds 5
+	$WaitTime += 5
+}
 
 remove-item c:\tempname.csv
 
@@ -244,23 +258,10 @@ Import-Csv $temppass | ForEach-Object {USERCREATE2 -username $_.username -school
 $pass= import-csv $temppass | select username,password| ConvertTo-Html -Fragment
 Send-MailMessage -To "hr@$domain" -Cc "me@$domain" -SmtpServer "smtp.office365.com" -Credential $mycreds -UseSsl "New users" -Port "587" -Body "$pass" -From "me@$domain" -BodyAsHtml
 
-#Prompt to continue
-$title = "Send Verizon Email?"
-
-$yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", `
-    "Sends email."
-
-$no = New-Object System.Management.Automation.Host.ChoiceDescription "&No", `
-    "Does not send email."
-
-$options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no)
-
-$result = $host.ui.PromptForChoice($title, $message, $options, 0) 
-
-if ($result -eq "1") {
-	Write-host "Will not send email"
-} else {
-	$users= import-csv $file | select first,last| ConvertTo-Html -Fragment
+#Send email to verizon requsting phones
+$users= import-csv $file | Where-Object {$_.phone -eq "Yes"} | select first,last
+if ($users) {
+	$users=$users | ConvertTo-Html -Fragment
 	Send-MailMessage -To "Carrier Rep" -SmtpServer "smtp.office365.com" -Credential $mycreds -UseSsl "New phone lines" -Port "587" -Body "Hey **NAME**,<br><br>Can we get lines added for the following?<br>$users<br><br>Thanks!" -From "me@$domain" -BodyAsHtml
 }
 
