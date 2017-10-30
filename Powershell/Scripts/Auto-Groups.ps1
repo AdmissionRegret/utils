@@ -1,0 +1,3 @@
+﻿Add-OUGroupMember -ShadowGroup "CN=all,OU=Org wide groups,OU=Mail Enabled Groups,DC=contoso,DC=com" -OU "OU=Users,DC=contoso,DC=com"
+Add-OUGroupMember -ShadowGroup "CN=NY,OU=Mail Enabled Groups,DC=contoso,DC=com" -OU "OU=NY,OU=Users,DC=contoso,DC=com" -OU2 "OU=Upper Management,OU=Users,DC=contoso,DC=com" -SharedGroupFilter NY
+Add-OUGroupMember -ShadowGroup "CN=LA-Office,OU=Mail Enabled Groups,DC=contoso,DC=com" -OU "OU=LA,OU=Users,DC=contoso,DC=com" -OU2 "OU=Upper Management,OU=Users,DC=contoso,DC=com" -SharedGroupFilter LA
