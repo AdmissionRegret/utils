@@ -8,16 +8,16 @@
    Sets signatures for users
    Assigns Google Apps app to Azure user
 .EXAMPLE
-   Sync-ContosoUser
+   Sync-User
 #>
-function Sync-ContosoUser
+function Sync-User
 {
     [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low')]
     [Alias()]
     [OutputType([int])]
     Param
     (
-        # Skips HR email
+        # SkipHREmail help description
         [Parameter(Mandatory=$false)]
         [Switch]$SkipHREmail
 
@@ -25,13 +25,17 @@ function Sync-ContosoUser
     
     Begin
     {
-        #Import Modules
+		$Elevated = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+		if ( -not $Elevated ) {
+			throw "This module requires elevation."
+		}
+        
+		#Import Modules
         Import-Module ADSync
-        Import-Module AADGraph
+        
         #Env variables
         $desktop=[Environment]::GetFolderPath("Desktop")
         $pdflog = $desktop+"\User-Automation\usercreation\html\"
-		$gam="\\server01\installs\gam-stu\gam.exe"
         
         #Set file locations
         $temppass=$desktop+"\User-Automation\usercreation\temppass.csv"
@@ -39,12 +43,16 @@ function Sync-ContosoUser
         $sigfile=$desktop+"\User-Automation\usercreation\sigs.csv"
         
         #Setup Azure connection
-        Load-ActiveDirectoryAuthenticationLibrary
+        $AzureUser = "cml@contoso.org"
+		$AzurePass = cat C:\Users\admin\Documents\WindowsPowerShell\securestring.txt | convertto-securestring
+		$AzureCred = New-Object -TypeName "System.Management.Automation.PSCredential" -ArgumentList $AzureUser, $AzurePass
+		Connect-AzureAD -Credential $AzureCred
+		$sp = Get-AzureADServicePrincipal -Filter "displayName eq 'G Suite'"
+		$appRole = $sp.AppRoles | Where-Object { $_.DisplayName -eq 'Default Organization' }
     }
     Process
     {
         Write-Verbose "Checking if Azure AD Sync is running..."
-
         While(Get-ADSyncConnectorRunStatus){
             Start-Sleep -Seconds 10
         }
@@ -59,11 +67,9 @@ function Sync-ContosoUser
         }
         Write-Verbose " | Complete!"
 
-        Write-Verbose "Adding users to groups based on OU"
-		&"C:\Users\admin\Documents\WindowsPowerShell\Scripts\Auto-Groups.ps1"
-        
-		Write-Verbose "Syncing users to G Suite"
-		&"C:\Program Files\Google Apps Directory Sync\sync-cmd.exe" -a -c C:\Users\admin\Documents\google-apps
+        #Run scripts to add users to groups based on OU and to sync google apps
+        &"C:\Users\admin\Documents\WindowsPowerShell\Scripts\Auto-Groups.ps1"
+        &"C:\Program Files\Google Cloud Directory Sync\sync-cmd.exe" -a -c C:\Users\admin\Documents\google-apps
 
 
         if ($SkipHREmail -eq $True) {
@@ -71,18 +77,21 @@ function Sync-ContosoUser
         } else {
             Write-Verbose "Sending usernames and passwords to HR"
             $pass= import-csv $temppass | select GivenName,SurName,username,password,title| ConvertTo-Html -Fragment
-            Get-ChildItem $pdflog | Where {-not $_.PSIsContainer} | foreach {$_.fullname} | Send-MailMessage -To "HR@contoso.com" -Cc "IT@contoso.com" -SmtpServer "smtp-relay.gmail.com" "New users" -Port "587" -Body "$pass" -From "UserCreation@contoso.com" -BodyAsHtml
+            Get-ChildItem $pdflog | Where {-not $_.PSIsContainer} | foreach {$_.fullname} | Send-MailMessage -To "hr@contoso.org" -Cc "cml@contoso.org" -SmtpServer "smtp-relay.gmail.com" "New users" -Port "587" -Body "$pass" -From "UserCreation@contoso.org" -BodyAsHtml
         }
         
-        Write-verbose "Setting Signatures"
-        $gam csv $sigfile gam user ~email signature ~sig
 
-        Write-Verbose "Adding Google Apps role to Azure AD"
-        $global:authenticationResult = Get-AuthenticationResult
-        Import-CSV $azure | %{$user = get-aaduser -Id $_.userprincipalname;Set-AppRoleAssignmentsGoogle -userId $user.Objectid}
+        #set signature for all users
+        \\server\Installs\Gam\gam.exe csv $sigfile gam user ~email signature ~sig
 
-        Write-Verbose "Resetting AAD Password sync"
+        #Add gogle apps role to azure ad
+		Import-CSV $azure | %{$user = Get-AzureADUser -ObjectId $_.userprincipalname;New-AzureADUserAppRoleAssignment -ObjectId $user.ObjectId -PrincipalId $user.ObjectId -ResourceId $sp.ObjectId -Id $appRole.Id}
+
+        #Reset AAD Password sync
         Update-AADConnector
+		
+		#Add teacher to teacher groups
+		\\server\Installs\Gam\gam.exe csv $sigfile gam update group classroom_teachers@contoso.org add member user ~email
                       
     }
     End
