@@ -1,1 +1,1 @@
-# utils
+This is a collection of utility scripts I have created (with the exception of pyhb.py) over the years.
